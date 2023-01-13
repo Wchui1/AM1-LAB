@@ -1,0 +1,52 @@
+function [Pmu_lg,P]=music(array,Rxx,M)
+%algorism of Multiple Signal Classification (MUSIC)
+%calculate covraiance Rxx using practical method
+
+%% test part
+% array=[-2 0 0; -1 0 0; 0 0 0; 1 0 0; 2 0 0];
+% directions=[30,0; 35,0; 90,0];
+% S=spv(array,directions);
+% Rmm=eye(3,3); % (A,A) (B,B) (C,C) are 1, others are 0
+% sigma2=0.0001;
+% Rxx_theoretical=S*Rmm*S'+sigma2*eye(5,5);
+% % Rxx=Rxx_theoretical;
+% 
+% load Xaudio.mat;
+% load Ximage.mat;
+% Rxx_au=X_au*X_au'/length(X_au(1,:));
+% Rxx_im=X_im*X_im'/length(X_im(1,:));
+% Rxx=Rxx_theoretical;
+% 
+% M=3;
+%% main function
+[E,D]=eig(Rxx); %E:eigenvectors, D: eigenvalues
+ %sort eigenvectors according to diagram of eigencalues from large to small 
+[d,idx]=sort(diag(D),'descend');
+% Ds=D(idx,idx);
+E=E(:,idx);
+[N,N1]=size(Rxx);
+
+%取矩阵噪声空间
+% En=E(:,M+1:N);
+%fpoc:complement projection operator of A(Pn)
+%P_n =I_N-P_Es, P_Es=Es*inv(Es'*Es)*Es';(Es: sorted eigenvectors)
+En=E(:,M+1:N);
+Es=E(:,1:M);
+Pn=fpoc(Es);
+% Pn=fpo(En);
+% Pn=eig(N)-PEs;
+for angle=1:181
+    direction=[angle-1,0];
+    S=spv(array,direction);
+    Pmu(angle)=1/(S'*Pn*S); 
+%     Pmu(angle)=1/(S'*En*(En')*S); 
+end
+Pmu=abs(Pmu);
+Pmu_max=max(Pmu);%arg_M_min
+% Pmmax=max(Pmusic);
+Pmu_lg=10*log10(Pmu);
+P=10*log10(Pmu/Pmu_max);
+
+% plot2d3d(Pmu_lg,0:180,0,'gain in dB','MuSIC pattern theoretical');
+%    
+% Sigma_n2=d(1,length(d));% noise power

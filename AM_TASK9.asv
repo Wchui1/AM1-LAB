@@ -1,0 +1,111 @@
+clc;clear;close all;
+%% task 9&10&11
+%basic parameters
+array=[-2 0 0; -1 0 0; 0 0 0; 1 0 0; 2 0 0];
+M=3; %number of signal (known)
+
+%% task9 music_theoretical 
+directions=[30,0; 35,0; 90,0];
+S=spv(array,directions);
+Rmm=eye(3,3); % (A,A) (B,B) (C,C) are 1, others are 0
+sigma2=0.0001;
+Rxx_theoretical=S*Rmm*S'+sigma2*eye(5,5);
+[Pmusic_theo,Ptheo]=music(array, Rxx_theoretical,M);
+plot2d3d(Pmusic_theo,0:180,0,'gain in dB','MuSIC pattern theoretical');
+
+%% task10 music_audio
+load Xaudio.mat;
+load Ximage.mat;
+% soundsc(real(X_au(2,:)),11025);
+% displayimage(X_im(2,:),image_size,201,'The received signal at 2nd antenna');
+Rxx_au=X_au*X_au'/length(X_au(1,:));
+[Pmusic_au,Pau]=music(array,Rxx_au,M);
+% plot2d3d(Pmusic_au,0:180,0,'gain in dB','MuSIC pattern audio signal');
+
+%% task10 music_image
+Rxx_im=X_im*X_im'/length(X_im(1,:)); 
+[Pmusic_im,Pim]=music(array,Rxx_im,M);
+% plot2d3d(Pmusic_im,0:180,0,'gain in dB','MuSIC pattern image signal');
+
+%% task11_part1 1&2 signals are fully correlated
+Rmm=[1,1,0;1,1,0;0,0,1]; %sources from 30 and 35 degrees fully correlated
+Rxx_coherent=S*Rmm*S'+sigma2*eye(5,5);
+[Pmusic_coherent,Pcoh]=music(array, Rxx_coherent,M);
+% plot2d3d(Pmusic_coherent,0:180,0,'gain in dB','MuSIC pattern fully correlated');
+
+%% task11_part2 smooth
+Rbar=smooth(array,Rmm,S);
+Rxx_smooth=S*Rbar*S'+sigma2*eye(5,5);
+[Psmooth,Pcoh]=music(array, Rxx_smooth,3);
+% plot2d3d(Psmooth,0:180,0,'gain in dB','Smooth MuSIC pattern of coherent signals ');
+
+%% task12 superresolution beamformer
+%part1 au
+Sd=spv(array,[90,0]); %Sdisire
+% wopt1=Rxx_au\Sd;
+% yt1=wopt1'*X_au;
+% soundsc(real(yt1),11025);
+
+
+%task2
+a=11000;
+wopt2=Rxx_im\Sd;
+yt2=a*wopt2'*X_im;
+displayimage(yt2, image_size, 202,'The received signal at o/p of W-Hbeamformer');
+
+%task3
+Sj=S(:,[1,2]); %
+% Sj=spv(array,[30,0;35,0]);
+Sd1=spv(array,[90,0]); %Sdisire
+
+wopt3=fpoc(Sj)*Sd1;
+yt3=0.22*wopt3'*X_im;
+displayimage(yt3, image_size, 203,'The received signal at o/p of superresolution beamformer 90 degrees');
+Z=pattern1(array, wopt3);
+plot2d3d(Z, 0:180,0,'gain in dB','superresolution array pattern 90 degrees');
+
+% listen the music of the desired direction after cancelling the other 2
+% directions
+wopt4=fpoc(Sj)*Sd1;
+yt4=wopt4'*X_au;
+soundsc(real(yt4),11025);
+%% task13 ALC & MDL
+Rmm=eye(3,3); % (A,A) (B,B) (C,C) are 1, others are 0
+sigma2_13=0.1;
+Rxx_theoretical13=S*Rmm*S'+sigma2_13*eye(5,5);
+L = 250;
+% aic and mdl algorithms to find number of signals
+Maic = AIC(Rxx_theoretical13,L);
+Mmdl = MDL(Rxx_theoretical13,L);
+
+% [Pmu131,~]=music(array, Rxx_theoretical13,Maic);
+% [Pmu132,~]=music(array, Rxx_theoretical13,Mmdl);
+% plot2d3d(Pmu131,0:180,0,'gain in dB','MuSIC pattern with sigma^2 = 0.1 (using AIC)');
+% plot2d3d(Pmu131,0:180,0,'gain in dB','MuSIC pattern with sigma^2 = 0.1 (using MDL)');
+
+%% task 14 adaptive beamformers
+% convergence coefficent u
+[E,D]=eig(Rxx_im); %E:eigenvectors, D: eigenvalues
+ %sort eigenvectors according to diagram of eigencalues from large to small 
+[d,idx]=sort(diag(D),'descend');
+% Ds=D(idx,idx);
+E=E(:,idx);
+umax = 1/d(1) % 1/3 upper bound for adaption gain
+u = 2e-06;
+[err_lms,w_LMS] = LMS(X_im, wopt3, u);
+yt_lms = 0.25*w_LMS(:,end)'*X_im;
+displayimage(yt_lms, image_size, 204,'The received signal at o/p of adaptive beamformer 90 degrees using LMS');
+figure()
+plot(1:20000,abs(err_lms(1:20000)))
+title('Errors using LMS algorithms')
+Zlms = pattern1(array,w_LMS(:,end));
+% plot2d3d(Zlms,0:180,0,'gain in dB','Array pattern in LMS adaptive beamformer with 90 degree desired source');
+
+[err_rls,w_RLS] = RLS(X_im, wopt3);
+yt_rls = 0.25*w_RLS(:,end)'*X_im;
+displayimage(yt_rls, image_size, 205,'The received signal at o/p of adaptive beamformer 90 degrees using RLS');
+figure()
+plot(1:10000,abs(err_rls(1:10000)))
+title('Errors using RLS algorithms')
+Zrls = pattern1(array,w_RLS(:,end));
+% plot2d3d(Zrls,0:180,0,'gain in dB','Array pattern in RLS adaptive beamformer with 90 degree desired source');
